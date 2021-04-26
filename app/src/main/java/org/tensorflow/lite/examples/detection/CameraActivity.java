@@ -90,15 +90,20 @@ public abstract class CameraActivity extends AppCompatActivity
   protected void onCreate(final Bundle savedInstanceState) {
     LOGGER.d("onCreate " + this);
     super.onCreate(null);
+    // 입력이 없어도 화면을 켜진 상태로 유지하기위한 설정
     getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
+    // 뷰(tfe_od_activity_camera.xml) inflate
+    // tfe_od_activity_camera는 tfe_od_layout_botton_sheet을 포함하는 뷰
     setContentView(R.layout.tfe_od_activity_camera);
+    // 퍼미션 확인
     if (hasPermission()) {
       setFragment();
     } else {
       requestPermission();
     }
 
+    // tfe_od_layout_botton_sheet의 요소들을 변수에 매핑
     threadsTextView = findViewById(R.id.threads);
     plusImageView = findViewById(R.id.plus);
     minusImageView = findViewById(R.id.minus);
@@ -108,6 +113,9 @@ public abstract class CameraActivity extends AppCompatActivity
     sheetBehavior = BottomSheetBehavior.from(bottomSheetLayout);
     bottomSheetArrowImageView = findViewById(R.id.bottom_sheet_arrow);
 
+    // bottom_sheet에 관한 내용
+    // 전체 뷰가 그려질때 사용할 리스너 추가 => 뷰가 완전히 생성되었는지 확인
+    // 컨텐츠가 visible한 상태가 되면 layout의 높이를 설정
     ViewTreeObserver vto = gestureLayout.getViewTreeObserver();
     vto.addOnGlobalLayoutListener(
         new ViewTreeObserver.OnGlobalLayoutListener() {
@@ -155,6 +163,7 @@ public abstract class CameraActivity extends AppCompatActivity
           public void onSlide(@NonNull View bottomSheet, float slideOffset) {}
         });
 
+    // tfe_od_layout_botton_sheet의 요소들을 변수에 매핑
     frameValueTextView = findViewById(R.id.frame_info);
     cropValueTextView = findViewById(R.id.crop_info);
     inferenceTimeTextView = findViewById(R.id.inference_info);
@@ -359,6 +368,8 @@ public abstract class CameraActivity extends AppCompatActivity
     return true;
   }
 
+  // 기기의 SDK version을 가져와 Marshmallow의 버전 코드와 비교
+  // 버전에 따라 카메라에 대한 퍼미션 결과를 반환
   private boolean hasPermission() {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
       return checkSelfPermission(PERMISSION_CAMERA) == PackageManager.PERMISSION_GRANTED;

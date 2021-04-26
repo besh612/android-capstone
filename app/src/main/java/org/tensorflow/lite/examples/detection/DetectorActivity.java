@@ -16,8 +16,10 @@
 
 package org.tensorflow.lite.examples.detection;
 
+import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Bitmap.Config;
+import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Matrix;
@@ -25,12 +27,24 @@ import android.graphics.Paint;
 import android.graphics.Paint.Style;
 import android.graphics.RectF;
 import android.graphics.Typeface;
+import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
 import android.media.ImageReader.OnImageAvailableListener;
 import android.os.SystemClock;
+import android.util.Log;
 import android.util.Size;
 import android.util.TypedValue;
 import android.widget.Toast;
+
+import androidx.annotation.NonNull;
+
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import org.tensorflow.lite.examples.detection.customview.OverlayView;
@@ -38,9 +52,18 @@ import org.tensorflow.lite.examples.detection.customview.OverlayView.DrawCallbac
 import org.tensorflow.lite.examples.detection.env.BorderedText;
 import org.tensorflow.lite.examples.detection.env.ImageUtils;
 import org.tensorflow.lite.examples.detection.env.Logger;
+import org.tensorflow.lite.examples.detection.server_communication.RetrofitService;
+import org.tensorflow.lite.examples.detection.server_communication.S3Object;
+import org.tensorflow.lite.examples.detection.server_communication.SendObject;
 import org.tensorflow.lite.examples.detection.tflite.Classifier;
 import org.tensorflow.lite.examples.detection.tflite.TFLiteObjectDetectionAPIModel;
 import org.tensorflow.lite.examples.detection.tracking.MultiBoxTracker;
+
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
+import retrofit2.Retrofit;
+import retrofit2.converter.gson.GsonConverterFactory;
 
 /**
  * An activity that uses a TensorFlowMultiBoxDetector and ObjectTracker to detect and then track
@@ -81,6 +104,20 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
   private MultiBoxTracker tracker;
 
   private BorderedText borderedText;
+
+//  Capstone...주형
+  private S3Object s3Object = new S3Object();
+  private Retrofit retrofit = null;
+  private RetrofitService retrofitService = null;
+  private int file_cnt=0;
+  private String file_name;
+  private File file_send;
+  private String uploadedFileUrl;
+  private Bitmap cropCopyPrevBitmap = null;
+  private double latitude;
+  private double longitude;
+  private double height;
+
 
   @Override
   public void onPreviewSizeChosen(final Size size, final int rotation) {
@@ -176,6 +213,10 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
         new Runnable() {
           @Override
           public void run() {
+            // 위치 탐색 서비스 시작
+            // 주형
+            startLocationService();
+
             LOGGER.i("Running detection on image " + currTimestamp);
             final long startTime = SystemClock.uptimeMillis();
             final List<Classifier.Recognition> results = detector.recognizeImage(croppedBitmap);
@@ -203,10 +244,54 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
               if (location != null && result.getConfidence() >= minimumConfidence) {
                 canvas.drawRect(location, paint);
 
-                Toast toast =
-                    Toast.makeText(
-                        getApplicationContext(), "균열 발견됨!", Toast.LENGTH_SHORT);
-                toast.show();
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//                2021.04.07 김주형 개발 시작
+                // 레트로핏 서비스 객체 생성
+                if (retrofit==null)
+                  retrofit = new Retrofit.Builder()
+                          .baseUrl(RetrofitService.URL)
+                          .addConverterFactory(GsonConverterFactory.create())
+                          .build();
+                if (retrofitService==null)
+                  retrofitService = retrofit.create(RetrofitService.class);
+
+                // 탐지된 이미지가 가장 처음 탐지된 이미지거나, 이전에 탐지된 이미지와 다르다면 S3서버 업로드
+                // 이분은 나중에 수정 => 이미지를 시간간격으로 올릴지?
+                if (cropCopyPrevBitmap == null || (comparePrevBitmap(cropCopyBitmap, cropCopyPrevBitmap) == false)) {
+                  HashMap<String, Object> sendData = new HashMap<>();
+                  file_name = "file_" + file_cnt;
+                  convertBitmapToFile(cropCopyBitmap, file_name);
+                  file_send = new File(getFilesDir() + "/" + file_name + ".jpg");
+                  uploadedFileUrl = s3Object.uploadWithTransferUtility(getApplicationContext(), file_name, file_send);
+                  file_cnt++;
+                  Toast toast =
+                          Toast.makeText(
+                                  //                        getApplicationContext(), "균열 발견됨!", Toast.LENGTH_SHORT);
+                                  getApplicationContext(), uploadedFileUrl, Toast.LENGTH_SHORT);
+                  toast.show();
+
+                  sendData.put("imageUrl", uploadedFileUrl);
+                  sendData.put("latitude", latitude);
+                  sendData.put("longitude", longitude);
+                  sendData.put("height", 0.0);
+                  retrofitService.postData(sendData).enqueue(new Callback<SendObject>() {
+                    @Override
+                    public void onResponse(Call<SendObject> call, Response<SendObject> response) {
+                      if (response.isSuccessful()) {
+                        SendObject body = response.body();
+                        if (body != null)
+                          Log.d("RETROFIT", "onResponse: 성공, 결과\n" + body.toString());
+                      }
+                    }
+                    @Override
+                    public void onFailure(Call<SendObject> call, Throwable t) {
+                      Log.d("RETROFIT", "onFailure: " + t.getMessage());
+                    }
+                  });
+                }
+                cropCopyPrevBitmap = cropCopyBitmap;
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
                 cropToFrameTransform.mapRect(location);
 
                 result.setLocation(location);
@@ -231,6 +316,60 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
           }
         });
   }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+  public void convertBitmapToFile(Bitmap bitmap_ori, String name) {
+    File storage = getFilesDir();
+    String fileName = name + ".jpg";
+    File imageFile = new File(storage, fileName);
+    try {
+      imageFile.createNewFile();
+      FileOutputStream outputStream = new FileOutputStream(imageFile);
+      bitmap_ori.compress(Bitmap.CompressFormat.JPEG, 10, outputStream);
+      outputStream.close();
+    } catch(Exception e) {}
+//        Log.d("AWS", imageFile.getAbsolutePath());
+    Bitmap bitmap = BitmapFactory.decodeFile(getFilesDir().getAbsolutePath() + "/" + fileName);
+//    bitmap = resizeImage(bitmap);
+  }
+  private boolean comparePrevBitmap(Bitmap bitmap1, Bitmap bitmap2) {
+    ByteBuffer buffer1 = ByteBuffer.allocate(bitmap1.getHeight() * bitmap1.getRowBytes());
+    bitmap1.copyPixelsToBuffer(buffer1);
+    ByteBuffer buffer2 = ByteBuffer.allocate(bitmap2.getHeight() * bitmap2.getRowBytes());
+    bitmap2.copyPixelsToBuffer(buffer2);
+    return Arrays.equals(buffer1.array(), buffer2.array());
+  }
+
+  // 현재 위치를 알기위한 메소드
+  public void startLocationService() {
+    LocationManager manager = (LocationManager)getSystemService(Context.LOCATION_SERVICE);
+    try {
+      Location location = manager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+      if (location != null) {
+        latitude = location.getLatitude();
+        longitude = location.getLongitude();
+      }
+      GPSListener gpsListener = new GPSListener();
+      long minTime = 10000;
+      float minDistance = 0;
+      manager.requestLocationUpdates(LocationManager.GPS_PROVIDER, minTime, minDistance, gpsListener);
+//            Toast.makeText(getApplicationContext(), "Checking Location Request complete", Toast.LENGTH_LONG).show();
+    } catch(SecurityException e) {}
+  }
+  // GPSListener 내부 클래스 정의
+  class GPSListener implements LocationListener {
+    @Override
+    public void onLocationChanged(@NonNull Location location) {
+      latitude = location.getLatitude();
+      longitude = location.getLongitude();
+    }
+    @Override
+    public void onProviderEnabled(@NonNull String provider) {}
+    @Override
+    public void onProviderDisabled(@NonNull String provider) {}
+  }
+  ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 
   @Override
   protected int getLayoutId() {
