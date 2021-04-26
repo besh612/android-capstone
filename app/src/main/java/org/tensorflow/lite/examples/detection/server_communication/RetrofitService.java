@@ -12,7 +12,8 @@ import retrofit2.http.Path;
 public interface RetrofitService {
 
     //    String URL = "http://jsonplaceholder.typicode.com";
-    String URL = "https://webhook.site";
+    // String URL = "https://webhook.site";
+    String URL = "http://101.101.216.124";
 
     // @GET: HTTP method(GET, POST, PUT, DELETE, HEAD)중 작업 선택
     // "posts/": 전체 URI에서 URL을 제외한 End point(URI)
@@ -36,7 +37,7 @@ public interface RetrofitService {
     //@FormUrlEncoded: Field형식 사용시 Form이 encoding되어야하므로 작성
     @FormUrlEncoded
 //    @POST("/posts")
-    @POST("/013170b0-b329-4f55-91c0-8d9d63f0d4c1")
+    @POST("/api/v1/crack")
 //    Call<Data> postData(@FieldMap HashMap<String, Object> param);
     Call<SendObject> postData(@FieldMap HashMap<String, Object> param);
 

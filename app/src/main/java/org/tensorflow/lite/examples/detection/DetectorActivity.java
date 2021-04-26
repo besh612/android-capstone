@@ -31,6 +31,7 @@ import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
 import android.media.ImageReader.OnImageAvailableListener;
+import android.os.Bundle;
 import android.os.SystemClock;
 import android.util.Log;
 import android.util.Size;
@@ -213,9 +214,6 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
         new Runnable() {
           @Override
           public void run() {
-            // 위치 탐색 서비스 시작
-            // 주형
-            startLocationService();
 
             LOGGER.i("Running detection on image " + currTimestamp);
             final long startTime = SystemClock.uptimeMillis();
@@ -247,13 +245,19 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                2021.04.07 김주형 개발 시작
                 // 레트로핏 서비스 객체 생성
-                if (retrofit==null)
+                if (retrofit==null) {
+                  Log.d("RETROFIT", "retrofit생성");
                   retrofit = new Retrofit.Builder()
                           .baseUrl(RetrofitService.URL)
                           .addConverterFactory(GsonConverterFactory.create())
                           .build();
-                if (retrofitService==null)
-                  retrofitService = retrofit.create(RetrofitService.class);
+                  if (retrofitService == null) {
+                    Log.d("RETROFIT", "retrofitService 생성");
+                    retrofitService = retrofit.create(RetrofitService.class);
+                  }
+                  Log.d("RETROFIT", "locationService 시작");
+                  startLocationService();
+                }
 
                 // 탐지된 이미지가 가장 처음 탐지된 이미지거나, 이전에 탐지된 이미지와 다르다면 S3서버 업로드
                 // 이분은 나중에 수정 => 이미지를 시간간격으로 올릴지?
@@ -355,6 +359,7 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
       manager.requestLocationUpdates(LocationManager.GPS_PROVIDER, minTime, minDistance, gpsListener);
 //            Toast.makeText(getApplicationContext(), "Checking Location Request complete", Toast.LENGTH_LONG).show();
     } catch(SecurityException e) {}
+//    Log.d("RETROFIT", "latitude: " + latitude + "longitude: " + longitude);
   }
   // GPSListener 내부 클래스 정의
   class GPSListener implements LocationListener {
@@ -363,6 +368,8 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
       latitude = location.getLatitude();
       longitude = location.getLongitude();
     }
+    @Override
+    public void onStatusChanged(String provider, int status, Bundle extras) {}
     @Override
     public void onProviderEnabled(@NonNull String provider) {}
     @Override
