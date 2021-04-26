@@ -3,6 +3,7 @@ package org.tensorflow.lite.examples.detection.server_communication;
 import java.util.HashMap;
 
 import retrofit2.Call;
+import retrofit2.http.Field;
 import retrofit2.http.FieldMap;
 import retrofit2.http.FormUrlEncoded;
 import retrofit2.http.GET;
@@ -12,8 +13,8 @@ import retrofit2.http.Path;
 public interface RetrofitService {
 
     //    String URL = "http://jsonplaceholder.typicode.com";
-    // String URL = "https://webhook.site";
-    String URL = "http://101.101.216.124";
+     String URL = "https://webhook.site";
+//    String URL = "http://101.101.216.124";
 
     // @GET: HTTP method(GET, POST, PUT, DELETE, HEAD)중 작업 선택
     // "posts/": 전체 URI에서 URL을 제외한 End point(URI)
@@ -37,8 +38,8 @@ public interface RetrofitService {
     //@FormUrlEncoded: Field형식 사용시 Form이 encoding되어야하므로 작성
     @FormUrlEncoded
 //    @POST("/posts")
-    @POST("/api/v1/crack")
+//    @POST("/api/v1/crack/{i}")
+    @POST("/fb06c77e-afe3-45e1-872b-a327ac5ec9f6")
 //    Call<Data> postData(@FieldMap HashMap<String, Object> param);
-    Call<SendObject> postData(@FieldMap HashMap<String, Object> param);
-
+        Call<SendObject> postData(@FieldMap HashMap<String, Object> param);
 }

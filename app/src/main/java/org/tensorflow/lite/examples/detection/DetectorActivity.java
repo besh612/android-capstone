@@ -274,10 +274,10 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
                                   getApplicationContext(), uploadedFileUrl, Toast.LENGTH_SHORT);
                   toast.show();
 
-                  sendData.put("imageUrl", uploadedFileUrl);
-                  sendData.put("latitude", latitude);
-                  sendData.put("longitude", longitude);
-                  sendData.put("height", 0.0);
+                  sendData.put("photoUrl", uploadedFileUrl);
+                  sendData.put("locationX", latitude);
+                  sendData.put("locationY", longitude);
+                  sendData.put("structureId", 1);
                   retrofitService.postData(sendData).enqueue(new Callback<SendObject>() {
                     @Override
                     public void onResponse(Call<SendObject> call, Response<SendObject> response) {
