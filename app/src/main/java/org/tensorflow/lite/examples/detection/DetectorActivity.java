@@ -48,6 +48,8 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
+
 import org.tensorflow.lite.examples.detection.customview.OverlayView;
 import org.tensorflow.lite.examples.detection.customview.OverlayView.DrawCallback;
 import org.tensorflow.lite.examples.detection.env.BorderedText;
@@ -60,6 +62,7 @@ import org.tensorflow.lite.examples.detection.tflite.Classifier;
 import org.tensorflow.lite.examples.detection.tflite.TFLiteObjectDetectionAPIModel;
 import org.tensorflow.lite.examples.detection.tracking.MultiBoxTracker;
 
+import okhttp3.OkHttpClient;
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
@@ -115,9 +118,10 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
   private File file_send;
   private String uploadedFileUrl;
   private Bitmap cropCopyPrevBitmap = null;
-  private double latitude;
-  private double longitude;
-  private double height;
+  private String latitude;
+  private String longitude;
+  private String altitude;
+  private String height;
 
 
   @Override
@@ -245,24 +249,34 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                2021.04.07 김주형 개발 시작
                 // 레트로핏 서비스 객체 생성
+
+                // 타임아웃 설정???
+                OkHttpClient okHttpClient = new OkHttpClient.Builder()
+                        .connectTimeout(1, TimeUnit.MINUTES)
+                        .readTimeout(30, TimeUnit.SECONDS)
+                        .writeTimeout(15, TimeUnit.SECONDS)
+                        .build();
+
                 if (retrofit==null) {
-                  Log.d("RETROFIT", "retrofit생성");
+//                  Log.d("RETROFIT", "retrofit생성");
                   retrofit = new Retrofit.Builder()
                           .baseUrl(RetrofitService.URL)
                           .addConverterFactory(GsonConverterFactory.create())
+                          .client(okHttpClient) //타임아웃 설정?
                           .build();
                   if (retrofitService == null) {
-                    Log.d("RETROFIT", "retrofitService 생성");
+//                    Log.d("RETROFIT", "retrofitService 생성");
                     retrofitService = retrofit.create(RetrofitService.class);
                   }
-                  Log.d("RETROFIT", "locationService 시작");
+//                  Log.d("RETROFIT", "locationService 시작");
                   startLocationService();
                 }
+
 
                 // 탐지된 이미지가 가장 처음 탐지된 이미지거나, 이전에 탐지된 이미지와 다르다면 S3서버 업로드
                 // 이분은 나중에 수정 => 이미지를 시간간격으로 올릴지?
                 if (cropCopyPrevBitmap == null || (comparePrevBitmap(cropCopyBitmap, cropCopyPrevBitmap) == false)) {
-                  HashMap<String, Object> sendData = new HashMap<>();
+//                  HashMap<String, Object> sendData = new HashMap<>();
                   file_name = "file_" + file_cnt;
                   convertBitmapToFile(cropCopyBitmap, file_name);
                   file_send = new File(getFilesDir() + "/" + file_name + ".jpg");
@@ -273,25 +287,52 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
                                   //                        getApplicationContext(), "균열 발견됨!", Toast.LENGTH_SHORT);
                                   getApplicationContext(), uploadedFileUrl, Toast.LENGTH_SHORT);
                   toast.show();
+                  SendObject sendData = new SendObject("null", "3.14592", "12.333", "15.322", "rkq",
+                          "222.222", "1", "comment", "1");
+//                  SendObject sendData = new SendObject(uploadedFileUrl, latitude, longitude, height);
+//                  sendData.put("photoUrl", uploadedFileUrl);
+//                  sendData.put("locationX", latitude);
+//                  sendData.put("locationY", longitude);
+//                  sendData.put("height", altitude);
+//                  sendData.put("structureId", "1");
+//                  // dump
+//                  sendData.put("width", "");
+//                  sendData.put("locationDetail", "");
+//                  sendData.put("riskLevelInteger", "");
+//                  sendData.put("comment", "");
 
-                  sendData.put("photoUrl", uploadedFileUrl);
-                  sendData.put("locationX", latitude);
-                  sendData.put("locationY", longitude);
-                  sendData.put("structureId", 1);
-                  retrofitService.postData(sendData).enqueue(new Callback<SendObject>() {
+                  retrofitService.postData(sendData).enqueue(new Callback<Integer>() {
                     @Override
-                    public void onResponse(Call<SendObject> call, Response<SendObject> response) {
+                    public void onResponse(Call<Integer> call, Response<Integer> response) {
                       if (response.isSuccessful()) {
-                        SendObject body = response.body();
+                        Log.d("RETROFIT", response.toString());
+                        Integer body = response.body();
                         if (body != null)
                           Log.d("RETROFIT", "onResponse: 성공, 결과\n" + body.toString());
                       }
                     }
                     @Override
-                    public void onFailure(Call<SendObject> call, Throwable t) {
+                    public void onFailure(Call<Integer> call, Throwable t) {
                       Log.d("RETROFIT", "onFailure: " + t.getMessage());
                     }
                   });
+//                  retrofitService.postData(sendData).enqueue(new Callback<Void>() {
+//                    @Override
+//                    public void onResponse(Call<Void> call, Response<Void> response) {
+//                      if (response.isSuccessful()) {
+//                        Log.d("RETROFIT", response.toString());
+//                        Void body = response.body();
+//                        if (body != null)
+//                          Log.d("RETROFIT", "onResponse: 성공, 결과\n" + body.toString());
+//                      }
+//                    }
+//                    @Override
+//                    public void onFailure(Call<Void> call, Throwable t) {
+//                      Log.d("RETROFIT", "onFailure: " + t.getMessage());
+//                    }
+//                  });
+
+
                 }
                 cropCopyPrevBitmap = cropCopyBitmap;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -350,8 +391,9 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
     try {
       Location location = manager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
       if (location != null) {
-        latitude = location.getLatitude();
-        longitude = location.getLongitude();
+        latitude = String.valueOf(location.getLatitude());
+        longitude = String.valueOf(location.getLongitude());
+        altitude = String.valueOf(location.getAltitude());
       }
       GPSListener gpsListener = new GPSListener();
       long minTime = 10000;
@@ -359,14 +401,15 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
       manager.requestLocationUpdates(LocationManager.GPS_PROVIDER, minTime, minDistance, gpsListener);
 //            Toast.makeText(getApplicationContext(), "Checking Location Request complete", Toast.LENGTH_LONG).show();
     } catch(SecurityException e) {}
-//    Log.d("RETROFIT", "latitude: " + latitude + "longitude: " + longitude);
+//    Log.d("RETROFIT", "latitude: " + latitude + "\nlongitude: " + longitude + "\naltitude: " + altitude);
   }
   // GPSListener 내부 클래스 정의
   class GPSListener implements LocationListener {
     @Override
     public void onLocationChanged(@NonNull Location location) {
-      latitude = location.getLatitude();
-      longitude = location.getLongitude();
+      latitude = String.valueOf(location.getLatitude());
+      longitude = String.valueOf(location.getLongitude());
+      altitude = String.valueOf(location.getAltitude());
     }
     @Override
     public void onStatusChanged(String provider, int status, Bundle extras) {}
