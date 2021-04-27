@@ -251,18 +251,18 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
                 // 레트로핏 서비스 객체 생성
 
                 // 타임아웃 설정???
-                OkHttpClient okHttpClient = new OkHttpClient.Builder()
-                        .connectTimeout(1, TimeUnit.MINUTES)
-                        .readTimeout(30, TimeUnit.SECONDS)
-                        .writeTimeout(15, TimeUnit.SECONDS)
-                        .build();
+//                OkHttpClient okHttpClient = new OkHttpClient.Builder()
+//                        .connectTimeout(1, TimeUnit.MINUTES)
+//                        .readTimeout(30, TimeUnit.SECONDS)
+//                        .writeTimeout(15, TimeUnit.SECONDS)
+//                        .build();
 
                 if (retrofit==null) {
 //                  Log.d("RETROFIT", "retrofit생성");
                   retrofit = new Retrofit.Builder()
                           .baseUrl(RetrofitService.URL)
                           .addConverterFactory(GsonConverterFactory.create())
-                          .client(okHttpClient) //타임아웃 설정?
+//                          .client(okHttpClient) //타임아웃 설정?
                           .build();
                   if (retrofitService == null) {
 //                    Log.d("RETROFIT", "retrofitService 생성");
@@ -287,20 +287,9 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
                                   //                        getApplicationContext(), "균열 발견됨!", Toast.LENGTH_SHORT);
                                   getApplicationContext(), uploadedFileUrl, Toast.LENGTH_SHORT);
                   toast.show();
-                  SendObject sendData = new SendObject("null", "3.14592", "12.333", "15.322", "rkq",
-                          "222.222", "1", "comment", "1");
-//                  SendObject sendData = new SendObject(uploadedFileUrl, latitude, longitude, height);
-//                  sendData.put("photoUrl", uploadedFileUrl);
-//                  sendData.put("locationX", latitude);
-//                  sendData.put("locationY", longitude);
-//                  sendData.put("height", altitude);
-//                  sendData.put("structureId", "1");
-//                  // dump
-//                  sendData.put("width", "");
-//                  sendData.put("locationDetail", "");
-//                  sendData.put("riskLevelInteger", "");
-//                  sendData.put("comment", "");
-
+                  SendObject sendData = new SendObject(uploadedFileUrl, "3.14592", latitude, longitude,
+                          "rkq", altitude, "1", "comment", "1");
+                  Log.d("RETROFIT", "POST Data: " + sendData.toString());
                   retrofitService.postData(sendData).enqueue(new Callback<Integer>() {
                     @Override
                     public void onResponse(Call<Integer> call, Response<Integer> response) {
