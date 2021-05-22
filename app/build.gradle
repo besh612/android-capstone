@@ -67,6 +67,7 @@ dependencies {
 
     // Retrofit 라이브러리
     implementation 'com.squareup.retrofit2:retrofit:2.6.4'
+    implementation 'com.squareup.okhttp3:logging-interceptor:3.12.1'
     // Gson 변환기 라이브러리
     implementation 'com.squareup.retrofit2:converter-gson:2.6.4'
     // Scalars 변환기 라이브러리

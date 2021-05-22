@@ -19,6 +19,7 @@ package org.tensorflow.lite.examples.detection;
 import android.Manifest;
 import android.app.Fragment;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.pm.PackageManager;
 import android.hardware.Camera;
 import android.hardware.camera2.CameraAccessException;
@@ -35,9 +36,12 @@ import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Trace;
 import androidx.annotation.NonNull;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.SwitchCompat;
 import androidx.appcompat.widget.Toolbar;
+
+import android.util.Log;
 import android.util.Size;
 import android.view.Surface;
 import android.view.View;
@@ -46,12 +50,23 @@ import android.view.WindowManager;
 import android.widget.CompoundButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.RadioButton;
 import android.widget.TextView;
 import android.widget.Toast;
 import com.google.android.material.bottomsheet.BottomSheetBehavior;
 import java.nio.ByteBuffer;
+import java.util.List;
+
 import org.tensorflow.lite.examples.detection.env.ImageUtils;
 import org.tensorflow.lite.examples.detection.env.Logger;
+import org.tensorflow.lite.examples.detection.server_communication.RetrofitService;
+import org.tensorflow.lite.examples.detection.server_communication.StructureObject;
+
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
+import retrofit2.Retrofit;
+import retrofit2.converter.gson.GsonConverterFactory;
 
 public abstract class CameraActivity extends AppCompatActivity
     implements OnImageAvailableListener,
@@ -86,6 +101,15 @@ public abstract class CameraActivity extends AppCompatActivity
   private SwitchCompat apiSwitchCompat;
   private TextView threadsTextView;
 
+  private Retrofit retrofit = null;
+  private RetrofitService retrofitService = null;
+  String TAG = "RETROFIT";
+  List<StructureObject> structureList = null;
+  String[] structureNameList=null;
+  String selectedStructureId = null;
+  final String[] words = new String[] {"사랑", "감사", "이해", "성공", "노력", "행운"};
+
+
   @Override
   protected void onCreate(final Bundle savedInstanceState) {
     LOGGER.d("onCreate " + this);
@@ -112,6 +136,43 @@ public abstract class CameraActivity extends AppCompatActivity
     gestureLayout = findViewById(R.id.gesture_layout);
     sheetBehavior = BottomSheetBehavior.from(bottomSheetLayout);
     bottomSheetArrowImageView = findViewById(R.id.bottom_sheet_arrow);
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////
+    // 주형 2021.05.19
+    if (retrofit==null) {
+      retrofit = new Retrofit.Builder()
+              .baseUrl(RetrofitService.URL)
+              .addConverterFactory(GsonConverterFactory.create())
+              .build();
+      if (retrofitService == null) {
+        retrofitService = retrofit.create(RetrofitService.class);
+      }
+    }
+    Call<List<StructureObject>> call = retrofitService.getStructureData("list");
+    call.enqueue(new Callback<List<StructureObject>>() {
+      @Override
+      public void onResponse(Call<List<StructureObject>> call, Response<List<StructureObject>> response) {
+        if (response.isSuccessful()) {
+          List<StructureObject> result = response.body();
+          Log.d(TAG, "onResponse: 성공, 결과\n" + result.toString());
+          structureList = result;
+          structureNameList = new String[structureList.size()];
+          for (int i=0; i<structureList.size(); ++i) {
+            structureNameList[i] = structureList.get(i).getName();
+          }
+        } else {
+          Log.d(TAG, "onResponse: 실패");
+        }
+        makeAlertDialog();
+      }
+      @Override
+      public void onFailure(Call<List<StructureObject>> call, Throwable t) {
+        Log.d(TAG, "onFailure: " + t.getMessage());
+      }
+    });
+    // 주형 end..
+    ////////////////////////////////////////////////////////////////////////////////////////////////
+
 
     // bottom_sheet에 관한 내용
     // 전체 뷰가 그려질때 사용할 리스너 추가 => 뷰가 완전히 생성되었는지 확인
@@ -173,6 +234,23 @@ public abstract class CameraActivity extends AppCompatActivity
     plusImageView.setOnClickListener(this);
     minusImageView.setOnClickListener(this);
   }
+
+  // 주형 2021.05.19
+  public void makeAlertDialog() {
+    AlertDialog.Builder builder = new AlertDialog.Builder(this);
+    builder.setTitle("Select Structure ID");
+    builder.setSingleChoiceItems(structureNameList, -1, new DialogInterface.OnClickListener() {
+      @Override
+      public void onClick(DialogInterface dialog, int which) {
+        selectedStructureId = String.valueOf(structureList.get(which).getId());
+//        Log.d(TAG, "Selected Structure: " + selectedStructureId);
+      }
+    });
+    builder.setPositiveButton("Ok", null);
+    AlertDialog alertDialog = builder.create();
+    alertDialog.show();
+  }
+  // 주형 end.
 
   protected int[] getRgbBytes() {
     imageConverter.run();

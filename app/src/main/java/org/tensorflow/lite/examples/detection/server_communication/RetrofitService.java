@@ -1,6 +1,7 @@
 package org.tensorflow.lite.examples.detection.server_communication;
 
 import java.util.HashMap;
+import java.util.List;
 
 import retrofit2.Call;
 import retrofit2.http.Body;
@@ -20,6 +21,9 @@ public interface RetrofitService {
 
     @GET("/api/v1/crack/{data}")
     Call<SendObject> getData(@Path("data") String param);
+
+    @GET("/api/v1/structure/{data}")
+    Call<List<StructureObject>> getStructureData(@Path("data") String param);
 
 
     @POST("/api/v1/crack")

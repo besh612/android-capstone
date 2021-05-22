@@ -44,7 +44,10 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.text.SimpleDateFormat;
 import java.util.Arrays;
+import java.util.Calendar;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -118,10 +121,12 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
   private File file_send;
   private String uploadedFileUrl;
   private Bitmap cropCopyPrevBitmap = null;
-  private String latitude;
-  private String longitude;
-  private String altitude;
+  private String locationX;
+  private String locationY;
   private String height;
+  private String structureId;
+  private long curTime = 0;
+  private long befTime = 0;
 
 
   @Override
@@ -274,54 +279,46 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
 
 
                 // 탐지된 이미지가 가장 처음 탐지된 이미지거나, 이전에 탐지된 이미지와 다르다면 S3서버 업로드
-                // 이분은 나중에 수정 => 이미지를 시간간격으로 올릴지?
-                if (cropCopyPrevBitmap == null || (comparePrevBitmap(cropCopyBitmap, cropCopyPrevBitmap) == false)) {
+                // 5초 단위로 탐지
+                if (curTime == 0) {
+                  curTime = System.currentTimeMillis();
+                  befTime = curTime;
+                }
+                curTime = System.currentTimeMillis();
+
+                if (selectedStructureId!=null && curTime-befTime>=5000) {
+                  befTime = curTime;
+                  if (cropCopyPrevBitmap == null || (comparePrevBitmap(cropCopyBitmap, cropCopyPrevBitmap) == false)) {
 //                  HashMap<String, Object> sendData = new HashMap<>();
-                  file_name = "file_" + file_cnt;
-                  convertBitmapToFile(cropCopyBitmap, file_name);
-                  file_send = new File(getFilesDir() + "/" + file_name + ".jpg");
-                  uploadedFileUrl = s3Object.uploadWithTransferUtility(getApplicationContext(), file_name, file_send);
-                  file_cnt++;
-                  Toast toast =
-                          Toast.makeText(
-                                  //                        getApplicationContext(), "균열 발견됨!", Toast.LENGTH_SHORT);
-                                  getApplicationContext(), uploadedFileUrl, Toast.LENGTH_SHORT);
-                  toast.show();
-                  SendObject sendData = new SendObject(uploadedFileUrl, "3.14592", latitude, longitude,
-                          "rkq", altitude, "1", "comment", "1");
-                  Log.d("RETROFIT", "POST Data: " + sendData.toString());
-                  retrofitService.postData(sendData).enqueue(new Callback<Integer>() {
-                    @Override
-                    public void onResponse(Call<Integer> call, Response<Integer> response) {
-                      if (response.isSuccessful()) {
-                        Log.d("RETROFIT", response.toString());
-                        Integer body = response.body();
-                        if (body != null)
-                          Log.d("RETROFIT", "onResponse: 성공, 결과\n" + body.toString());
+                    file_name = "file_" + file_cnt;
+                    convertBitmapToFile(cropCopyBitmap, file_name);
+                    file_send = new File(getFilesDir() + "/" + file_name + ".jpg");
+                    uploadedFileUrl = s3Object.uploadWithTransferUtility(getApplicationContext(), file_name, file_send);
+                    file_cnt++;
+                    Toast toast =
+                            Toast.makeText(
+                                    //                        getApplicationContext(), "균열 발견됨!", Toast.LENGTH_SHORT);
+                                    getApplicationContext(), uploadedFileUrl, Toast.LENGTH_SHORT);
+                    toast.show();
+                    SendObject sendData = new SendObject(uploadedFileUrl, "3.14592", locationX, locationY,
+                            "rkq", height, "3", "comment", selectedStructureId);
+                    Log.d("RETROFIT", "POST Data: " + sendData.toString());
+                    Log.d("RETROFIT", "FLAG");
+                    retrofitService.postData(sendData).enqueue(new Callback<Integer>() {
+                      @Override
+                      public void onResponse(Call<Integer> call, Response<Integer> response) {
+                        if (response.isSuccessful()) {
+                          Integer body = response.body();
+                          if (body != null)
+                            Log.d("RETROFIT", "onResponse: 성공, 결과\n" + body.toString());
+                        }
                       }
-                    }
-                    @Override
-                    public void onFailure(Call<Integer> call, Throwable t) {
-                      Log.d("RETROFIT", "onFailure: " + t.getMessage());
-                    }
-                  });
-//                  retrofitService.postData(sendData).enqueue(new Callback<Void>() {
-//                    @Override
-//                    public void onResponse(Call<Void> call, Response<Void> response) {
-//                      if (response.isSuccessful()) {
-//                        Log.d("RETROFIT", response.toString());
-//                        Void body = response.body();
-//                        if (body != null)
-//                          Log.d("RETROFIT", "onResponse: 성공, 결과\n" + body.toString());
-//                      }
-//                    }
-//                    @Override
-//                    public void onFailure(Call<Void> call, Throwable t) {
-//                      Log.d("RETROFIT", "onFailure: " + t.getMessage());
-//                    }
-//                  });
-
-
+                      @Override
+                      public void onFailure(Call<Integer> call, Throwable t) {
+                        Log.d("RETROFIT", "onFailure: " + t.getMessage());
+                      }
+                    });
+                  }
                 }
                 cropCopyPrevBitmap = cropCopyBitmap;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -380,9 +377,9 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
     try {
       Location location = manager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
       if (location != null) {
-        latitude = String.valueOf(location.getLatitude());
-        longitude = String.valueOf(location.getLongitude());
-        altitude = String.valueOf(location.getAltitude());
+        locationX = String.valueOf(location.getLatitude());
+        locationY = String.valueOf(location.getLongitude());
+        height = String.valueOf(location.getAltitude());
       }
       GPSListener gpsListener = new GPSListener();
       long minTime = 10000;
@@ -396,9 +393,9 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
   class GPSListener implements LocationListener {
     @Override
     public void onLocationChanged(@NonNull Location location) {
-      latitude = String.valueOf(location.getLatitude());
-      longitude = String.valueOf(location.getLongitude());
-      altitude = String.valueOf(location.getAltitude());
+      locationX = String.valueOf(location.getLatitude());
+      locationY = String.valueOf(location.getLongitude());
+      height = String.valueOf(location.getAltitude());
     }
     @Override
     public void onStatusChanged(String provider, int status, Bundle extras) {}
