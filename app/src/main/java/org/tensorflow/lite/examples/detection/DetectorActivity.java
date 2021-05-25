@@ -51,6 +51,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import org.tensorflow.lite.examples.detection.customview.OverlayView;
@@ -276,7 +277,7 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
 //                  Log.d("RETROFIT", "locationService 시작");
                   startLocationService();
                 }
-
+                UUID uuid = UUID.randomUUID();
 
                 // 탐지된 이미지가 가장 처음 탐지된 이미지거나, 이전에 탐지된 이미지와 다르다면 S3서버 업로드
                 // 5초 단위로 탐지
@@ -290,16 +291,18 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
                   befTime = curTime;
                   if (cropCopyPrevBitmap == null || (comparePrevBitmap(cropCopyBitmap, cropCopyPrevBitmap) == false)) {
 //                  HashMap<String, Object> sendData = new HashMap<>();
-                    file_name = "file_" + file_cnt;
+//                    file_name = "file_" + file_cnt;
+                    file_name = uuid.toString() + System.currentTimeMillis();
                     convertBitmapToFile(cropCopyBitmap, file_name);
                     file_send = new File(getFilesDir() + "/" + file_name + ".jpg");
                     uploadedFileUrl = s3Object.uploadWithTransferUtility(getApplicationContext(), file_name, file_send);
                     file_cnt++;
-                    Toast toast =
-                            Toast.makeText(
-                                    //                        getApplicationContext(), "균열 발견됨!", Toast.LENGTH_SHORT);
-                                    getApplicationContext(), uploadedFileUrl, Toast.LENGTH_SHORT);
-                    toast.show();
+//                    Toast toast =
+//                            Toast.makeText(
+//                                    //                        getApplicationContext(), "균열 발견됨!", Toast.LENGTH_SHORT);
+//                                    getApplicationContext(), file_send.getPath(), Toast.LENGTH_SHORT);
+//                    toast.show();
+                    Log.d("RETROFIT", file_name + "-=--" + file_send.getPath());
                     SendObject sendData = new SendObject(uploadedFileUrl, "3.14592", locationX, locationY,
                             "rkq", height, "3", "comment", selectedStructureId);
                     Log.d("RETROFIT", "POST Data: " + sendData.toString());
